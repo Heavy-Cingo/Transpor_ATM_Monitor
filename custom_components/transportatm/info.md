@@ -8,7 +8,7 @@ hacs:
   logo: true
 ---
 
-![Logo](./logo.png)
+![Logo](/custom_components/transportatm/logo.png)
 
 # TransportATM Monitor
 
