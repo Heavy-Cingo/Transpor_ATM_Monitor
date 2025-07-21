@@ -8,6 +8,7 @@
 
 Questo componente integra i dati ATM in Home Assistant, permettendo di visualizzare il tempo di attesa in reale time degli autobus\tram di una fermata.
 
+<img width="358" height="126" alt="image" src="https://github.com/user-attachments/assets/8ab6f4b8-8279-4284-baa0-bd9378e7c15e" />
 
 
 ## 🛠️ Installazione manuale
@@ -45,4 +46,95 @@ Se si imposta un intervallo di aggiornamento (update interval) di 60 secondi, si
 
 Nota:
 Non è consigliato impostare un update interval inferiore a 30 secondi per evitare un eccesso di richieste che potrebbero essere interpretate come traffico da bot dal server ATM.
+
+🧩 Esempio di Card Personalizzata in Lovelace
+Questo è un esempio di card realizzata con button-card e layout-card, che mostra due linee ATM in un'unica visualizzazione. Ogni linea è colorata dinamicamente in base al tempo di arrivo:
+- Verde se mancano più di 8 minuti
+- Arancione se mancano tra 5 e 8 minuti
+- Rosso se mancano meno di 5 minuti o il mezzo è in arrivo
+
+<details>
+<summary>💡 Clicca qui per vedere l'esempio completo della Card Lovelace</summary>
+
+```yaml
+(type: custom:layout-card
+layout_type: custom:grid-layout
+cards:
+  - type: custom:button-card
+    name: 🚋 Fermata Bus
+    styles:
+      card:
+        - height: 110px
+        - width: 350px
+        - border-radius: 15px
+        - padding: 10px 15px
+        - font-size: 20px
+        - text-shadow: 0px 0px 5px black
+        - text-transform: capitalize
+        - margin-left: "-10px"
+      grid:
+        - grid-template-areas: '"n" "Linea1" "Linea2"'
+        - grid-template-columns: 1fr
+        - grid-template-rows: min-content min-content min-content
+      name:
+        - font-weight: bold
+        - font-size: 23px
+        - color: goldenrod
+        - align-self: start
+        - justify-self: start
+        - padding-bottom: 4px
+      custom_fields:
+        Linea1:
+          - justify-self: start
+          - text-align: left
+          - font-size: 16px
+          - padding-bottom: 4px
+        Linea2:
+          - justify-self: start
+          - text-align: left
+          - font-size: 16px
+    custom_fields:
+      Linea1: |
+        [[[ 
+          let stato = states['sensor.transportatm211335_2']?.state || 'N/A';
+          let colore = 'gray';
+          if (stato.toLowerCase().includes('arrivo')) {
+            colore = 'red';
+          } else {
+            let minuti = parseInt(stato);
+            if (!isNaN(minuti)) {
+              if (minuti > 8) colore = 'limegreen';
+              else if (minuti > 4) colore = 'orange';
+              else colore = 'red';
+            }
+          }
+          return `<ha-icon icon="mdi:bus-clock" style="width: 20px; height: 20px; color: ${colore}; margin-right: 5px;"></ha-icon>
+                  <span>Linea 1: <span style="color: ${colore}">${stato}</span></span>`;
+        ]]]
+      Linea2: |
+        [[[ 
+          let stato = states['sensor.transportatm9211335_2']?.state || 'N/A';
+          let colore = 'gray';
+          if (stato.toLowerCase().includes('arrivo')) {
+            colore = 'red';
+          } else {
+            let minuti = parseInt(stato);
+            if (!isNaN(minuti)) {
+              if (minuti > 8) colore = 'limegreen';
+              else if (minuti > 4) colore = 'orange';
+              else colore = 'red';
+            }
+          }
+          return `<ha-icon icon="mdi:bus-clock" style="width: 20px; height: 20px; color: ${colore}; margin-right: 5px;"></ha-icon>
+                  <span>Linea 2: <span style="color: ${colore}">${stato}</span></span>`;
+        ]]]
+grid_options:
+  columns: 9
+  rows: 2
+layout:
+  grid-template-columns: 60% 1
+  grid-template-rows: auto
+  grid-template-areas: |
+    "main notify update")
+
 
