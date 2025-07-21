@@ -1,0 +1,8 @@
+{
+  "name": "Transport ATM Monitor",
+  "content_in_root": false,
+  "domain": "transportatm",
+  "homeassistant": "2025.0.1",
+  "render_readme": true,
+  "zip_release": false
+}
