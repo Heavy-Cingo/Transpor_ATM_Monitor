@@ -1,9 +1,13 @@
 {
   "domain": "transportatm",
-  "name": "Transport ATM Monitor",
+  "name": "TransportATM Monitor",
   "version": "1.0.0",
   "documentation": "https://github.com/Heavy-Cingo/Transpor_ATM_Monitor",
+  "issue_tracker": "https://github.com/Heavy-Cingo/Transpor_ATM_Monitor/issues",
   "requirements": [],
   "dependencies": [],
-  "codeowners": ["@Heavy-Cingo"]
+  "codeowners": ["@Heavy-Cingo"],
+  "iot_class": "cloud_polling",
+  "integration_type": "sensor",
+  "loggers": ["custom_components.transportatm"]
 }
