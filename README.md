@@ -10,19 +10,24 @@ Questo componente integra i dati ATM in Home Assistant, permettendo di visualizz
 
 <img width="358" height="126" alt="image" src="https://github.com/user-attachments/assets/8ab6f4b8-8279-4284-baa0-bd9378e7c15e" />
 
+---
 
 ## 🛠️ Installazione manuale
 
 1. Copiare la cartella `transportatm` in `custom_components` nella tua installazione di Home Assistant dentro il percorso \config\custom_components\transportatm
 3. Riavviare Home Assistant  
 
+---
 
-📲 Installazione tramite HACS 
+## 📲 Installazione tramite HACS 
+
 1. Aggiungere il repository custom a HACS
 2. Installare il componente da HACS
 3. Riavviare Home Assistant
 
-🖼️ Screenshot e Istruzioni di Configurazione
+---
+
+## 🖼️ Screenshot e Istruzioni di Configurazione
 Dopo aver installato il componente, segui questi passaggi per aggiungere l'integrazione:
 
 1. Vai su Dispositivi e Servizi in Home Assistant.
@@ -39,15 +44,19 @@ Dopo aver installato il componente, segui questi passaggi per aggiungere l'integ
 
 <img width="567" height="520" alt="image" src="https://github.com/user-attachments/assets/30d10aae-2080-4fdb-ab60-e7edd17c518f" />
 
+--- 
 
-Aggiornamento Sensore
+## Aggiornamento Sensore
 È possibile forzare l'aggiornamento del sensore usando il comando entity_update.
 Se si imposta un intervallo di aggiornamento (update interval) di 60 secondi, si può usare questo comando per aggiornare i dati manualmente.
 
 Nota:
 Non è consigliato impostare un update interval inferiore a 30 secondi per evitare un eccesso di richieste che potrebbero essere interpretate come traffico da bot dal server ATM.
 
-🧩 Esempio di Card Personalizzata in Lovelace
+---
+
+## 🧩 Esempio di Card Personalizzata in Lovelace
+
 Questo è un esempio di card realizzata con button-card e layout-card, che mostra due linee ATM in un'unica visualizzazione. Ogni linea è colorata dinamicamente in base al tempo di arrivo:
 - Verde se mancano più di 8 minuti
 - Arancione se mancano tra 5 e 8 minuti
