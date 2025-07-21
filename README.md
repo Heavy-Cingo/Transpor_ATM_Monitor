@@ -9,34 +9,14 @@
 Questo componente integra i dati ATM in Home Assistant, permettendo di visualizzare il tempo di attesa in reale time degli autobus\tram di una fermata.
 
 
----
-
-## 📁 Struttura del progetto
-
-custom_components/
-└── transportatm/
-    ├── __init__.py
-    ├── manifest.json
-    ├── sensor.py
-    ├── binary_sensor.py
-README.md
-LICENSE
-
----
 
 ## 🛠️ Installazione manuale
 
-1. Copiare la cartella `transportatm` in `custom_components` nella tua installazione di Home Assistant  
-2. Riavviare Home Assistant  
-3. Inserire nel `configuration.yaml`:
-
-``yaml
-transportatm:
-  api_key: "LA_TUA_API_KEY"
-  # altre opzioni
+1. Copiare la cartella `transportatm` in `custom_components` nella tua installazione di Home Assistant dentro il percorso \config\custom_components\transportatm
+3. Riavviare Home Assistant  
 
 
-📲 Installazione tramite HACS (se supportato)
+📲 Installazione tramite HACS 
 1. Aggiungere il repository custom a HACS
 2. Installare il componente da HACS
 3. Riavviare Home Assistant
