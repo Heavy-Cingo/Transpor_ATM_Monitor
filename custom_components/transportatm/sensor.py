@@ -45,6 +45,9 @@ class TransportATMMonitor(SensorEntity):
             "refreshsec": self._refreshsec,
         }
 
+        # Client HTTP persistente
+        self._client = httpx.AsyncClient(timeout=10)
+
     async def async_added_to_hass(self):
         """Register periodic update callback."""
         self.async_on_remove(
@@ -52,6 +55,10 @@ class TransportATMMonitor(SensorEntity):
                 self.hass, self.async_update, timedelta(seconds=self._refreshsec)
             )
         )
+
+    async def async_will_remove_from_hass(self):
+        """Chiudi il client HTTP quando l’entità viene rimossa."""
+        await self._client.aclose()
 
     @property
     def name(self):
@@ -101,25 +108,19 @@ class TransportATMMonitor(SensorEntity):
             "https://giromilano.atm.it/proxy.tpportal/api/tpPortal/geodata/pois/stops/"
             + self._busstopnumber
         )
-        async with httpx.AsyncClient() as session:
-            try:
-                response = await session.get(url, headers=headers)
-                if response.status_code != 200:
-                    return "Error"
-                data = response.json()
-                linee = data["Lines"]
-                kk = None
-                for linea in linee:
-                    if linea["Line"]["LineId"] == self._line:
-                        kk = linea["WaitMessage"]
-                        break
-                return kk if kk is not None else "No data"
-            except httpx.HTTPStatusError as e:
-                _LOGGER.error(
-                    f"Errore HTTP: {e.response.status_code} - {e.response.text}"
-                )
-            except httpx.RequestError as e:
-                _LOGGER.error(f"Errore di connessione: {e}")
-            except Exception as e:
-                _LOGGER.error(f"Errore generico: {e}")
+        try:
+            response = await self._client.get(url, headers=headers)
+            if response.status_code != 200:
+                return "Error"
+            data = response.json()
+            for linea in data.get("Lines", []):
+                if linea["Line"]["LineId"] == self._line:
+                    return linea.get("WaitMessage", "No data")
+            return "No data"
+        except httpx.HTTPStatusError as e:
+            _LOGGER.error(f"Errore HTTP: {e.response.status_code} - {e.response.text}")
+        except httpx.RequestError as e:
+            _LOGGER.error(f"Errore di connessione: {e}")
+        except Exception as e:
+            _LOGGER.error(f"Errore generico: {e}")
         return "Error"
