@@ -1,6 +1,6 @@
 import logging
+import httpx
 from datetime import timedelta
-import aiohttp
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -8,8 +8,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 
-DOMAIN = "transportatm"
+DOMAIN = "transport_atm_monitor"
 _LOGGER = logging.getLogger(__name__)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -20,26 +21,32 @@ async def async_setup_entry(
     line = config_entry.data["Line"]
     busstopnumber = config_entry.data["Bus_Stop_Number"]
     refreshsec = config_entry.data["Refresh_Time_sec"]
-
     async_add_entities([TransportATMMonitor(line, busstopnumber, refreshsec)], True)
 
 
 class TransportATMMonitor(SensorEntity):
-    """Transport ATM sensor."""
+    """Representation of the ATM transport sensor."""
 
     def __init__(self, line: str, busstopnumber: str, refreshsec: int):
+        """Initialize the sensor."""
+        self._available = True
         self._line = line
         self._busstopnumber = busstopnumber
         self._refreshsec = refreshsec
-        self._state = None
-        self._attr_extra_state_attributes = {}
-        self._available = True
 
+        self.entity_id = f"sensor.transportatm{line}{busstopnumber}"
         self._attr_name = f"TransportATM {line} {busstopnumber}"
-        self._unique_id = f"{DOMAIN}_{line}_{busstopnumber}"
+        self._unique_id = f"{DOMAIN}_{self.entity_id}"
+
+        self._state = "Wait in calculation"
+        self._attr_extra_state_attributes = {
+            "line": self._line,
+            "busstopnumber": self._busstopnumber,
+            "refreshsec": self._refreshsec,
+        }
 
     async def async_added_to_hass(self):
-        """Schedule periodic update."""
+        """Register periodic update callback."""
         self.async_on_remove(
             async_track_time_interval(
                 self.hass, self.async_update, timedelta(seconds=self._refreshsec)
@@ -48,11 +55,18 @@ class TransportATMMonitor(SensorEntity):
 
     @property
     def name(self):
+        """Return the name of the sensor."""
         return self._attr_name
 
     @property
     def state(self):
+        """Return the state of the sensor."""
         return self._state
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit of measurement."""
+        return None
 
     @property
     def unique_id(self):
@@ -60,30 +74,52 @@ class TransportATMMonitor(SensorEntity):
 
     @property
     def available(self):
+        """Return True if entity is available."""
         return self._available
 
+    @property
+    def should_poll(self) -> bool:
+        """Enable manual update via homeassistant.update_entity."""
+        return True
+
     async def async_update(self, *_):
-        """Fetch data from ATM API."""
-        url = f"https://giromilano.atm.it/proxy.tpportal/api/tpPortal/geodata/pois/stops/{self._busstopnumber}"
-        headers = {
-            "User-Agent": "Mozilla/5.0"
+        """Fetch new state data for the sensor."""
+        self._attr_extra_state_attributes = {
+            "line": self._line,
+            "busstopnumber": self._busstopnumber,
+            "refreshsec": self._refreshsec,
         }
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, timeout=10) as response:
-                    if response.status != 200:
-                        _LOGGER.warning("HTTP error %s", response.status)
-                        self._state = "Error"
-                        return
-                    data = await response.json()
-                    lines = data.get("Lines", [])
-                    value = next(
-                        (line_item["WaitMessage"] for line_item in lines if line_item["Line"]["LineId"] == self._line),
-                        None
-                    )
-                    self._state = value if value else "No data"
-        except Exception as e:
-            _LOGGER.error("Error fetching ATM data: %s", e)
-            self._state = "Error"
-        finally:
-            self.async_write_ha_state()
+        self._state = await self.fetch_with_header()
+        self.async_write_ha_state()
+
+    async def fetch_with_header(self) -> str:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
+        }
+        url = (
+            "https://giromilano.atm.it/proxy.tpportal/api/tpPortal/geodata/pois/stops/"
+            + self._busstopnumber
+        )
+        async with httpx.AsyncClient() as session:
+            try:
+                response = await session.get(url, headers=headers)
+                if response.status_code != 200:
+                    return "Error"
+                data = response.json()
+                linee = data["Lines"]
+                kk = None
+                for linea in linee:
+                    if linea["Line"]["LineId"] == self._line:
+                        kk = linea["WaitMessage"]
+                        break
+                return kk if kk is not None else "No data"
+            except httpx.HTTPStatusError as e:
+                _LOGGER.error(
+                    f"Errore HTTP: {e.response.status_code} - {e.response.text}"
+                )
+            except httpx.RequestError as e:
+                _LOGGER.error(f"Errore di connessione: {e}")
+            except Exception as e:
+                _LOGGER.error(f"Errore generico: {e}")
+        return "Error"
