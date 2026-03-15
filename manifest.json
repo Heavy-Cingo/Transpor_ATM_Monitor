@@ -1,13 +1,13 @@
 {
-    "domain": "transport_atm_monitor",
-    "name": "Transport ATM Monitor",
-    "config_flow": true,
-    "documentation": "https://www.example.com",
-    "requirements": [],
-    "ssdp": [],
-    "zeroconf": [],
-    "homekit": {},
-    "dependencies": [],
-    "codeowners": ["@yourgithubusername"],
-    "version": "0.1.0"
-  }
+  "domain": "transport_atm_monitor",
+  "name": "Transport ATM Monitor",
+  "version": "2.0.0",
+  "config_flow": true,
+  "documentation": "https://www.example.com",
+  "requirements": ["httpx>=0.24"],
+  "dependencies": [],
+  "ssdp": [],
+  "zeroconf": [],
+  "codeowners": ["@Heavy-Cingo"],
+  "iot_class": "cloud_polling"
+}
