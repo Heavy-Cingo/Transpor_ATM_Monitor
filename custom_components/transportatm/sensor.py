@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 
-DOMAIN = "transport_atm_monitor"
+DOMAIN = "transportatm"
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -45,9 +45,6 @@ class TransportATMMonitor(SensorEntity):
             "refreshsec": self._refreshsec,
         }
 
-        # Client HTTP persistente
-        self._client = httpx.AsyncClient(timeout=10)
-
     async def async_added_to_hass(self):
         """Register periodic update callback."""
         self.async_on_remove(
@@ -56,23 +53,16 @@ class TransportATMMonitor(SensorEntity):
             )
         )
 
-    async def async_will_remove_from_hass(self):
-        """Chiudi il client HTTP quando l’entità viene rimossa."""
-        await self._client.aclose()
-
     @property
     def name(self):
-        """Return the name of the sensor."""
         return self._attr_name
 
     @property
     def state(self):
-        """Return the state of the sensor."""
         return self._state
 
     @property
     def unit_of_measurement(self):
-        """Return the unit of measurement."""
         return None
 
     @property
@@ -81,12 +71,10 @@ class TransportATMMonitor(SensorEntity):
 
     @property
     def available(self):
-        """Return True if entity is available."""
         return self._available
 
     @property
     def should_poll(self) -> bool:
-        """Enable manual update via homeassistant.update_entity."""
         return True
 
     async def async_update(self, *_):
@@ -109,16 +97,20 @@ class TransportATMMonitor(SensorEntity):
             + self._busstopnumber
         )
         try:
-            response = await self._client.get(url, headers=headers)
-            if response.status_code != 200:
-                return "Error"
-            data = response.json()
-            for linea in data.get("Lines", []):
-                if linea["Line"]["LineId"] == self._line:
-                    return linea.get("WaitMessage", "No data")
-            return "No data"
+            async with httpx.AsyncClient(timeout=10) as session:
+                response = await session.get(url, headers=headers)
+                if response.status_code != 200:
+                    return "Error"
+                data = response.json()
+                linee = data.get("Lines", [])
+                for linea in linee:
+                    if linea["Line"]["LineId"] == self._line:
+                        return linea.get("WaitMessage", "No data")
+                return "No data"
         except httpx.HTTPStatusError as e:
-            _LOGGER.error(f"Errore HTTP: {e.response.status_code} - {e.response.text}")
+            _LOGGER.error(
+                f"Errore HTTP: {e.response.status_code} - {e.response.text}"
+            )
         except httpx.RequestError as e:
             _LOGGER.error(f"Errore di connessione: {e}")
         except Exception as e:
