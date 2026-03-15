@@ -1,14 +1,12 @@
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 import homeassistant.helpers.config_validation as cv
 
 from .const import DOMAIN
 
-
-class RandomNumberSensorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Random Number Sensor."""
+class TransportATMConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Transport ATM Monitor."""
 
     VERSION = 1
 
@@ -17,13 +15,14 @@ class RandomNumberSensorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         if user_input is not None:
             return self.async_create_entry(
-                title="Transport ATM Milano Monitor", data=user_input
+                title=f"Line {user_input['Line']} Stop {user_input['Bus_Stop_Number']}",
+                data=user_input
             )
 
         data_schema = vol.Schema(
             {
-                vol.Required("Line", default=0): cv.string,
-                vol.Required("Bus_Stop_Number", default=0): cv.string,
+                vol.Required("Line", default="0"): cv.string,
+                vol.Required("Bus_Stop_Number", default="0"): cv.string,
                 vol.Required("Refresh_Time_sec", default=30): int,
             }
         )
