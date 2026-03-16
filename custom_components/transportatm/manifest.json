@@ -4,13 +4,9 @@
   "version": "2.0.0",
   "documentation": "https://github.com/Heavy-Cingo/Transpor_ATM_Monitor",
   "issue_tracker": "https://github.com/Heavy-Cingo/Transpor_ATM_Monitor/issues",
-  "requirements": ["httpx>=0.24"],
-  "dependencies": [],
   "codeowners": ["@Heavy-Cingo"],
   "iot_class": "cloud_polling",
-  "loggers": ["custom_components.transportatm"],
+  "integration_type": "hub",
   "config_flow": true,
-  "assets": {
-    "icon": "logo.png"
-  }
+  "requirements": []
 }
