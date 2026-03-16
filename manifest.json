@@ -1,13 +1,16 @@
 {
-  "domain": "transport_atm_monitor",
-  "name": "Transport ATM Monitor",
+  "domain": "transportatm",
+  "name": "TransportATM Monitor",
   "version": "2.0.0",
-  "config_flow": true,
-  "documentation": "https://www.example.com",
+  "documentation": "https://github.com/Heavy-Cingo/Transpor_ATM_Monitor",
+  "issue_tracker": "https://github.com/Heavy-Cingo/Transpor_ATM_Monitor/issues",
   "requirements": ["httpx>=0.24"],
   "dependencies": [],
-  "ssdp": [],
-  "zeroconf": [],
   "codeowners": ["@Heavy-Cingo"],
-  "iot_class": "cloud_polling"
+  "iot_class": "cloud_polling",
+  "loggers": ["custom_components.transportatm"],
+  "config_flow": true,
+  "assets": {
+    "icon": "logo.png"
+  }
 }
