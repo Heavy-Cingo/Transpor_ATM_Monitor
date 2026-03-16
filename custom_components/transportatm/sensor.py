@@ -1,7 +1,10 @@
 import logging
-import httpx
+import asyncio  # <-- ti serve per asyncio.TimeoutError
 from datetime import timedelta
 
+import aiohttp
+from aiohttp import ClientError
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -34,6 +37,7 @@ class TransportATMMonitor(SensorEntity):
         self._busstopnumber = busstopnumber
         self._refreshsec = refreshsec
 
+        # Mantengo il tuo entity_id personalizzato per compatibilità con automazioni esistenti
         self.entity_id = f"sensor.transportatm{line}{busstopnumber}"
         self._attr_name = f"TransportATM {line} {busstopnumber}"
         self._unique_id = f"{DOMAIN}_{self.entity_id}"
@@ -80,7 +84,7 @@ class TransportATMMonitor(SensorEntity):
     @property
     def should_poll(self) -> bool:
         """Enable manual update via homeassistant.update_entity."""
-        return True
+        return True  # ok: puoi forzare update_entity oltre al timer interno
 
     async def async_update(self, *_):
         """Fetch new state data for the sensor."""
@@ -89,37 +93,56 @@ class TransportATMMonitor(SensorEntity):
             "busstopnumber": self._busstopnumber,
             "refreshsec": self._refreshsec,
         }
-        self._state = await self.fetch_with_header()
+        new = await self.fetch_with_header()
+        if new not in ("Error", None):
+            self._state = new
+            self._available = True
+        else:
+            # se l’API fallisce, segnalo non disponibile (evita confusione con il placeholder)
+            self._available = False
         self.async_write_ha_state()
 
     async def fetch_with_header(self) -> str:
+        """HTTP GET usando la sessione di Home Assistant (aiohttp), con header 'credibili'."""
         headers = {
-            "User-Agent": "Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) "
-            "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/121.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "it-IT,it;q=0.9",
+            "Referer": "https://giromilano.atm.it/it",
+            "Origin": "https://giromilano.atm.it",
         }
+
         url = (
             "https://giromilano.atm.it/proxy.tpportal/api/tpPortal/geodata/pois/stops/"
             + self._busstopnumber
         )
-        async with httpx.AsyncClient() as session:
-            try:
-                response = await session.get(url, headers=headers)
-                if response.status_code != 200:
+
+        session = async_get_clientsession(self.hass)
+        timeout = aiohttp.ClientTimeout(total=10)
+
+        try:
+            async with session.get(url, headers=headers, timeout=timeout) as resp:
+                if resp.status != 200:
+                    _LOGGER.warning("ATM HTTP %s", resp.status)
                     return "Error"
-                data = response.json()
-                linee = data["Lines"]
-                kk = None
+
+                data = await resp.json(content_type=None)
+                linee = data.get("Lines", [])
+
                 for linea in linee:
-                    if linea["Line"]["LineId"] == self._line:
-                        kk = linea["WaitMessage"]
-                        break
-                return kk if kk is not None else "No data"
-            except httpx.HTTPStatusError as e:
-                _LOGGER.error(
-                    f"Errore HTTP: {e.response.status_code} - {e.response.text}"
-                )
-            except httpx.RequestError as e:
-                _LOGGER.error(f"Errore di connessione: {e}")
-            except Exception as e:
-                _LOGGER.error(f"Errore generico: {e}")
+                    # confronto come stringhe per evitare mismatch int/str
+                    if str(linea["Line"]["LineId"]) == str(self._line):
+                        return linea.get("WaitMessage", "No data")
+
+                return "No data"
+
+        except (ClientError, asyncio.TimeoutError) as e:
+            _LOGGER.error("Errore di rete ATM: %s", e)
+        except Exception as e:
+            _LOGGER.error("Errore generico ATM: %s", e)
+
         return "Error"
