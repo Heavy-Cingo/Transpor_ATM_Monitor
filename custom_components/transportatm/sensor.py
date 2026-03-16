@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 
-DOMAIN = "transport_atm_monitor"
+DOMAIN = "transportatm"
 _LOGGER = logging.getLogger(__name__)
 
 
