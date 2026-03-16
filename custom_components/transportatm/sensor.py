@@ -1,7 +1,7 @@
 import logging
-import asyncio  # <-- ti serve per asyncio.TimeoutError
+import asyncio
 import random
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import aiohttp
 from aiohttp import ClientError
@@ -34,9 +34,14 @@ class TransportATMMonitor(SensorEntity):
     def __init__(self, line: str, busstopnumber: str, refreshsec: int):
         """Initialize the sensor."""
         self._available = True
-        self._line = line
-        self._busstopnumber = busstopnumber
-        self._refreshsec = refreshsec
+        self._line = str(line)
+        self._busstopnumber = str(busstopnumber)
+        self._refreshsec = int(refreshsec)
+
+        # Anti-403 state
+        self._consecutive_403 = 0
+        self._blocked_until: datetime | None = None
+        self._cooloff_minutes = 2  # puoi cambiare (es. 5 min)
 
         # Mantengo il tuo entity_id personalizzato per compatibilità con automazioni esistenti
         self.entity_id = f"sensor.transportatm{line}{busstopnumber}"
@@ -52,6 +57,9 @@ class TransportATMMonitor(SensorEntity):
 
     async def async_added_to_hass(self):
         """Register periodic update callback."""
+        # (facoltativo) piccolo jitter iniziale per non allineare più sensori
+        await asyncio.sleep(random.uniform(0.1, 1.0))
+
         self.async_on_remove(
             async_track_time_interval(
                 self.hass, self.async_update, timedelta(seconds=self._refreshsec)
@@ -60,17 +68,19 @@ class TransportATMMonitor(SensorEntity):
 
     @property
     def name(self):
-        """Return the name of the sensor."""
         return self._attr_name
 
     @property
     def state(self):
-        """Return the state of the sensor."""
         return self._state
 
     @property
+    def icon(self) -> str:
+        # icona carina lato UI; non influisce su HACS
+        return "mdi:bus-clock"
+
+    @property
     def unit_of_measurement(self):
-        """Return the unit of measurement."""
         return None
 
     @property
@@ -79,21 +89,27 @@ class TransportATMMonitor(SensorEntity):
 
     @property
     def available(self):
-        """Return True if entity is available."""
         return self._available
 
     @property
     def should_poll(self) -> bool:
-        """Enable manual update via homeassistant.update_entity."""
-        return True  # ok: puoi forzare update_entity oltre al timer interno
+        """Usiamo solo il timer interno, niente polling extra di HA."""
+        return False
 
     async def async_update(self, *_):
         """Fetch new state data for the sensor."""
+        # Se siamo in cool-off, salta la chiamata in questo giro
+        if self._blocked_until and datetime.utcnow() < self._blocked_until:
+            self._available = False
+            self.async_write_ha_state()
+            return
+
         self._attr_extra_state_attributes = {
             "line": self._line,
             "busstopnumber": self._busstopnumber,
             "refreshsec": self._refreshsec,
         }
+
         new = await self.fetch_with_header()
         if new not in ("Error", None):
             self._state = new
@@ -101,11 +117,11 @@ class TransportATMMonitor(SensorEntity):
         else:
             # se l’API fallisce, segnalo non disponibile (evita confusione con il placeholder)
             self._available = False
+
         self.async_write_ha_state()
 
     async def fetch_with_header(self) -> str:
         """HTTP GET usando la sessione HA con priming cookie, header completi e backoff anti-403."""
-
         session = async_get_clientsession(self.hass)
         timeout = aiohttp.ClientTimeout(total=12)
 
@@ -149,29 +165,53 @@ class TransportATMMonitor(SensorEntity):
         max_attempts = 3
         for attempt in range(1, max_attempts + 1):
             try:
-                # jitter per evitare colpi sincronizzati se hai più entità
+                # piccolo jitter per evitare colpi sincronizzati se hai più entità
                 await asyncio.sleep(random.uniform(0.1, 0.4))
 
                 async with session.get(api_url, headers=headers, timeout=timeout) as resp:
                     if resp.status in (403, 429):
+                        # Conta i 403 consecutivi e attiva eventualmente il cool-off
+                        self._consecutive_403 += 1
+
                         if attempt < max_attempts:
                             _LOGGER.warning("ATM HTTP %s (tentativo %s)", resp.status, attempt)
-                            # prima dell’ultimo tentativo, ripeti il priming
+                            # Prima dell’ultimo tentativo, ripeti il priming (può aggiornare i cookie)
                             if attempt == max_attempts - 1:
                                 try:
                                     async with session.get(home_url, headers=headers, timeout=timeout) as r2:
                                         _ = await r2.text()
                                 except Exception as exc2:
                                     _LOGGER.debug("Priming extra fallito (ignoro): %s", exc2)
+                            # backoff breve
                             await asyncio.sleep(0.6 * attempt)  # 0.6s, 1.2s
                             continue
-                        # ultimo tentativo fallito: logga un estratto del body e termina
-                        text = await resp.text()
-                        _LOGGER.error("ATM %s risposta: %s", resp.status, text[:250])
+
+                        # ultimo tentativo: valuta cool-off
+                        if self._consecutive_403 >= 4:
+                            self._blocked_until = datetime.utcnow() + timedelta(minutes=self._cooloff_minutes)
+                            _LOGGER.warning(
+                                "Troppi 403 consecutivi (%s): cool-off %s minuti (fino a %s).",
+                                self._consecutive_403,
+                                self._cooloff_minutes,
+                                self._blocked_until.isoformat(timespec="seconds"),
+                            )
+                            # reset contatore (ripartirà dopo il cool-off)
+                            self._consecutive_403 = 0
+                        else:
+                            # non raggiunta la soglia, solo log e rinvio al prossimo slot
+                            text = await resp.text()
+                            _LOGGER.warning("ATM %s risposta (estratto): %s", resp.status, text[:160])
+
                         return "Error"
 
+                    # Se non è 403/429, valida lo status
                     resp.raise_for_status()
+
                     data = await resp.json(content_type=None)
+
+                    # Successo: reset contatori/blocco
+                    self._consecutive_403 = 0
+                    self._blocked_until = None
 
                     # Estrai il WaitMessage per la linea richiesta
                     for linea in data.get("Lines", []):
